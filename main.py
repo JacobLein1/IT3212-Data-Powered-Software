@@ -72,16 +72,20 @@ data_cleaned = clean_data(crop1_wide.copy())
 
 """
 
-Calculate average variance, and variance per item/year group, for Yield. Also remove outliers based on a moving average per Area/Item time series, and print the number of rows removed.
+Calculate average variance, and variance per item/year group, for Yield. Also remove outliers based on ARIMA residuals per Area/Item time series, and print the number of rows removed.
 
 """
 
 # OUTLIER DETECTION!
 
-crop1_wide_filtered = remove_outliers(data_cleaned)
+# ARIMA residuals per Area/Item series; the fits are cached in arima_residuals.csv after the first run
+crop1_wide_filtered = remove_outliers(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
+#crop1_wide_filtered = remove_outliers(data_cleaned, method="moving_average", window=5, threshold=0.5)
 
-#plot_outlier_examples(data_cleaned)
-plot_outlier_examples(data_cleaned, examples=[("Eastern Europe", "Mushrooms and truffles")])
+# plot_outlier_examples(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
+# plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
+plot_outlier_examples(data_cleaned, method="arima", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
+plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
 
 # ============================================================
 # 1. Variasjonskoeffisient (CV) per Item/Year — bedre enn ren varians
