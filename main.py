@@ -89,22 +89,14 @@ Calculate average variance, and variance per item/year group, for Yield. Also re
 """
 
 # OUTLIER DETECTION!
-data_transformed = transform_data(data_cleaned)
-
-crop1_wide_clean = data_cleaned.dropna(subset=['Yield'])
-def filter_within_percentile(df, column, confidence=0.90, by=None):
-    tail = (1 - confidence) / 2
-    if by:
-        lower = df.groupby(by)[column].transform(lambda x: x.quantile(tail))
-        upper = df.groupby(by)[column].transform(lambda x: x.quantile(1 - tail))
-    else:
-        lower = df[column].quantile(tail)
-        upper = df[column].quantile(1 - tail)
-    return df[(df[column] >= lower) & (df[column] <= upper)]
 
 # ARIMA residuals per Area/Item series; the fits are cached in arima_residuals.csv after the first run
 crop1_wide_filtered = remove_outliers(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
 #crop1_wide_filtered = remove_outliers(data_cleaned, method="moving_average", window=5, threshold=0.5)
+
+
+# DATA TRANSFORMATION!
+crop1_transformed = transform_data(crop1_wide_filtered)
 
 # plot_outlier_examples(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
 # plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
@@ -114,121 +106,10 @@ plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswan
 # PLOTS (from data_transformed, computed right after cleaning)
 
 os.makedirs("plots", exist_ok=True)
-plot_raw_distributions(data_transformed, save_path="plots/raw_distributions.png")
-plot_log_distributions(data_transformed, save_path="plots/log_distributions.png")
-plot_log_z_distributions(data_transformed, save_path="plots/log_z_distributions.png")
-plot_transform_steps_histograms(data_transformed, save_path="plots/transform_steps_histograms.png")
-plot_transform_steps_qq(data_transformed, save_path="plots/transform_steps_qq.png")
-plot_transform_steps_boxplots(data_transformed, save_path="plots/transform_steps_boxplots.png")
-plot_item_transform_steps(data_transformed, item="Wheat", save_path="plots/wheat_transform_steps.png")
-
-# ============================================================
-# 1. Variasjonskoeffisient (CV) per Item/Year — bedre enn ren varians
-#    fordi den er sammenlignbar på tvers av varer med ulikt Yield-nivå
-# ============================================================
-def yield_cv_within_items(df):
-    """
-    Standardavvik, gjennomsnitt og variasjonskoeffisient (CV = std/mean)
-    for Yield innad i hver Item/Year-gruppe.
-    Lav CV -> Yield er stabilt på tvers av land -> godt å estimere med.
-    Høy CV -> stor spredning mellom land -> upålitelig å estimere med.
-    """
-    stats_df = df.groupby(['Item', 'Year'])['Yield'].agg(['mean', 'std', 'count'])
-    stats_df['cv'] = stats_df['std'] / stats_df['mean']
-
-    # Krever minst 2 land for at std/cv skal gi mening
-    stats_df = stats_df[stats_df['count'] >= 2]
-
-    print("10 mest USTABILE Item/Year-grupper (høyest CV):")
-    print(stats_df.sort_values('cv', ascending=False).head(10))
-
-    print("\n10 mest STABILE Item/Year-grupper (lavest CV):")
-    print(stats_df.sort_values('cv', ascending=True).head(10))
-
-    print(f"\nGjennomsnittlig CV på tvers av alle Item/Year-grupper: {stats_df['cv'].mean():.3f}")
-    print(f"Median CV på tvers av alle Item/Year-grupper: {stats_df['cv'].median():.3f}")
-
-    return stats_df
-
-
-#cv_stats = yield_cv_within_items(crop1_wide_filtered)
-
-
-# ============================================================
-# 2. Aggregert CV per Item (på tvers av alle år) — for å se hvilke
-#    varetyper generelt er "trygge" å bruke Yield-estimering på
-# ============================================================
-def cv_summary_per_item(cv_stats_df):
-    """Gjennomsnittlig CV per Item, aggregert over alle år."""
-    summary = (
-        cv_stats_df
-        .groupby('Item')['cv']
-        .mean()
-        .sort_values(ascending=False)
-    )
-    print("Items med høyest gjennomsnittlig CV (minst pålitelige å estimere fra):")
-    print(summary.head(10))
-    print("\nItems med lavest gjennomsnittlig CV (mest pålitelige å estimere fra):")
-    print(summary.tail(10))
-    return summary
-
-
-#item_cv_summary = cv_summary_per_item(cv_stats)
-
-
-# ============================================================
-# 3. Direkte test av estimeringsfeil: bruk median Yield per Item/Year
-#    til å estimere Production fra Area harvested, og mål feilen
-#    mot faktisk Production
-# ============================================================
-def evaluate_yield_estimation(df):
-    """
-    Tester hvor god metoden 'Production = Area harvested * typisk Yield' er,
-    ved å sammenligne estimert Production mot faktisk Production for
-    rader der begge finnes.
-    """
-    df = df.dropna(subset=['Area harvested', 'Yield', 'Production']).copy()
-
-    # "Typisk" Yield = median på tvers av land, for samme Item/Year
-    df['Yield_typical'] = df.groupby(['Item', 'Year'])['Yield'].transform('median')
-
-    # Estimer Production: production (tonnes) = area_harvested (ha) * yield (hg/ha) / 10_000
-    df['Production_est'] = df['Area harvested'] * df['Yield_typical'] / 10_000
-
-    df['abs_error'] = (df['Production_est'] - df['Production']).abs()
-    df['rel_error'] = df['abs_error'] / df['Production'].replace(0, np.nan)
-
-    print("Feilmetrikk for Production-estimering (median Yield-metode):")
-    print(df['rel_error'].describe())
-    print(f"\nMedian absolutt relativ feil: {df['rel_error'].median():.2%}")
-    print(f"Gjennomsnittlig absolutt relativ feil: {df['rel_error'].mean():.2%}")
-    print(f"Andel rader med relativ feil < 10%: {(df['rel_error'] < 0.10).mean():.2%}")
-    print(f"Andel rader med relativ feil < 25%: {(df['rel_error'] < 0.25).mean():.2%}")
-
-    return df
-
-
-#estimation_results = evaluate_yield_estimation(crop1_wide_filtered)
-
-
-# ============================================================
-# 4. Bryt estimeringsfeilen ned per Item, for å se hvilke varer
-#    metoden fungerer godt/dårlig for
-# ============================================================
-def estimation_error_per_item(estimation_df):
-    """Median relativ feil i Production-estimering, per Item."""
-    summary = (
-        estimation_df
-        .groupby('Item')['rel_error']
-        .median()
-        .sort_values(ascending=False)
-    )
-    print("Items med HØYEST median relativ feil (dårligst egnet for estimering):")
-    print(summary.head(10))
-    print("\nItems med LAVEST median relativ feil (best egnet for estimering):")
-    print(summary.tail(10))
-    return summary
-
-
-#item_error_summary = estimation_error_per_item(estimation_results)
-
+plot_raw_distributions(crop1_transformed, save_path="plots/raw_distributions.png")
+plot_log_distributions(crop1_transformed, save_path="plots/log_distributions.png")
+plot_log_z_distributions(crop1_transformed, save_path="plots/log_z_distributions.png")
+plot_transform_steps_histograms(crop1_transformed, save_path="plots/transform_steps_histograms.png")
+plot_transform_steps_qq(crop1_transformed, save_path="plots/transform_steps_qq.png")
+plot_transform_steps_boxplots(crop1_transformed, save_path="plots/transform_steps_boxplots.png")
+plot_item_transform_steps(crop1_transformed, item="Wheat", save_path="plots/wheat_transform_steps.png")
