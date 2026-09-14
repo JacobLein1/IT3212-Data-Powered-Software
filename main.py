@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from scipy import stats
-import matplotlib.pyplot as plt
+from clean import clean_data
+from plot import plot_item_time_series, plot_all_elements_in_area, plot_item_all_areas
 crop1 = pd.read_csv("food.bank/crop1.csv")
 
 print(crop1.head())
@@ -33,73 +34,9 @@ print(f"Percentage of rows with at least one missing value: {round((num_missing_
 print(crop1_wide)
 
 
-def plot_item_time_series(df, item, country):
-    elements = ["Area harvested", "Yield", "Production"]
-
-    subset = df[(df['Item'] == item) & (df['Area'] == country)].sort_values('Year')
-
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
-    for ax, element in zip(axes, elements):
-        ax.plot(subset['Year'], subset[element], marker='o', markersize=2)
-        ax.set_title(element)
-        ax.set_xlabel("Year")
-
-    axes[0].set_ylabel("Value")
-    fig.suptitle(f"{item} — {country}")
-    plt.tight_layout()
-    plt.show()
-
 #plot_item_time_series(crop1, "Almonds, with shell", "Afghanistan")
 
-def plot_all_elements_in_area(df, area):
-    """For one area: one subplot per element, with one line per item (crop) over time."""
-    subset = df[df['Area'] == area]
-    elements = subset['Element'].unique()
-
-    fig, axes = plt.subplots(1, len(elements), figsize=(6 * len(elements), 4))
-    if len(elements) == 1:
-        axes = [axes]
-
-    for ax, element in zip(axes, elements):
-        element_data = subset[subset['Element'] == element]
-        for item, group in element_data.groupby('Item'):
-            group = group.sort_values('Year')
-            ax.plot(group['Year'], group['Value'], marker='o', markersize=2, label=item)
-        ax.set_title(element)
-        ax.set_xlabel("Year")
-
-    axes[0].set_ylabel("Value")
-    axes[-1].legend(fontsize=6, ncol=2, loc='upper left', bbox_to_anchor=(1, 1))
-    fig.suptitle(area)
-    plt.tight_layout()
-    plt.show()
-
-
 #plot_all_elements_in_area(crop1, "Afghanistan")
-
-def plot_item_all_areas(df, item):
-    """For one item: one subplot per element, with one line per area over time."""
-    subset = df[df['Item'] == item]
-    elements = subset['Element'].unique()
-
-    fig, axes = plt.subplots(1, len(elements), figsize=(6 * len(elements), 4))
-    if len(elements) == 1:
-        axes = [axes]
-
-    for ax, element in zip(axes, elements):
-        element_data = subset[subset['Element'] == element]
-        for area, group in element_data.groupby('Area'):
-            group = group.sort_values('Year')
-            ax.plot(group['Year'], group['Value'], marker='o', markersize=2, label=area)
-        ax.set_title(element)
-        ax.set_xlabel("Year")
-
-    axes[0].set_ylabel("Value")
-    axes[-1].legend(fontsize=6, ncol=2, loc='upper left', bbox_to_anchor=(1, 1))
-    fig.suptitle(item)
-    plt.tight_layout()
-    plt.show()
-
 
 #plot_item_all_areas(crop1, "Almonds, with shell")
 
@@ -162,102 +99,7 @@ for col in value_cols:
 
 # DATA CLEANING!
 
-# remove startup and end-lag rows
-value_cols = ['Area harvested', 'Yield', 'Production']
-crop1_wide = crop1_wide.sort_values(['Area', 'Item', 'Year']).reset_index(drop=True)
-
-is_real = ~(crop1_wide[value_cols].fillna(0) == 0).all(axis=1)
-group = [crop1_wide['Area'], crop1_wide['Item']]
-
-seen_real_from_start = is_real.groupby(group).cumsum()
-seen_real_from_end = is_real[::-1].groupby(group).cumsum()[::-1]
-
-crop1_wide_trimmed = crop1_wide[
-    (seen_real_from_start > 0) & (seen_real_from_end > 0)
-].reset_index(drop=True)
-
-print(crop1_wide_trimmed.isna().sum().sum())
-print(crop1_wide_trimmed)
-# we can compute the corret missing value if two other values of the same row are present:
-one_missing_mask = crop1_wide_trimmed[value_cols].isna().sum(axis=1) == 1
-for index, row in crop1_wide_trimmed.loc[one_missing_mask].iterrows():
-    area_harvested = row["Area harvested"]
-    yld = row["Yield"]
-    production = row["Production"]
-
-
-    if area_harvested == 0 or yld == 0 or production == 0:
-        continue
-
-    # production (tonnes) = area_harvested (ha) * yield (hg/ha) / 10_000
-    # area_harvested = production * 10_000 / yield
-    # yield = production * 10_000 / area_harvested
-    
-    if pd.isna(area_harvested):
-        crop1_wide_trimmed.loc[index, "Area harvested"] = (production * 10_000) / yld
-    if pd.isna(yld):
-        crop1_wide_trimmed.loc[index, "Yield"] = (production * 10_000) / area_harvested
-    if pd.isna(production):
-        crop1_wide_trimmed.loc[index, "Production"] = (area_harvested * yld) / 10_000
-
-
-print("CROP1 TRIMMED!")
-num_missing_vals = crop1_wide_trimmed.isna().sum().sum()
-print(f"Number of missing values: {num_missing_vals}")
-num_value_rows = len(crop1_wide_trimmed) * 3 #3 is number of value columns we have in the dataset
-num_rows = len(crop1_wide_trimmed)
-print(f"Number of rows: {num_rows}")
-print("Missing values per column")
-print(crop1_wide_trimmed.isna().sum())
-print(f"Percentage of values that are missing: {round((num_missing_vals/num_value_rows)*100, 2)}%")
-num_missing_vals_rows = crop1_wide_trimmed.isna().any(axis=1).sum()
-print(f"Rows with at least one missing value: {num_missing_vals_rows}")
-print(f"Percentage of rows with at least one missing value: {round((num_missing_vals_rows/num_rows)*100, 2)}%")
-print(crop1_wide_trimmed)
-
-value_cols = ['Area harvested', 'Yield', 'Production']
-
-cols = ['Area harvested', 'Production', 'Yield']
-
-def has_overlap(group):
-    non_nan_count = group[cols].notna().sum(axis=1)  # per-row: how many of the 3 are present
-    return (non_nan_count >= 2).any()  # True if at least one row has 2+ series present together
-
-overlap_by_group = (
-    crop1_wide_trimmed
-    .groupby(['Area', 'Item'])
-    .apply(has_overlap)
-)
-
-to_drop = overlap_by_group[~overlap_by_group].index  # groups with NO overlap anywhere
-to_keep = overlap_by_group[overlap_by_group].index
-
-print(f"Dropping {len(to_drop)} Area+Item series with no cross-column overlap")
-print(f"Keeping {len(to_keep)} series")
-
-# Filter the dataframe
-mask = crop1_wide_trimmed.set_index(['Area', 'Item']).index.isin(to_drop)
-crop1_wide_cleaned = crop1_wide_trimmed[~mask].reset_index(drop=True)
-
-print(crop1_wide_cleaned)
-
-
-# Count NaNs
-nan_counts = (
-    crop1_wide_cleaned
-    .groupby(['Area', 'Item'])[value_cols]
-    .apply(lambda g: g.isna().sum().sum())
-    .sort_values(ascending=False)
-)
-
-# Grab the worst offender
-top_area, top_item = nan_counts.index[0]
-worst_series = crop1_wide_trimmed[(crop1_wide_trimmed['Area'] == top_area) & (crop1_wide_trimmed['Item'] == top_item)].sort_values('Year')
-
-print(nan_counts)
-
-plot_item_time_series(crop1_wide_cleaned, "Hemp tow waste", "Germany")
-plot_item_time_series(crop1_wide_cleaned, "Rubber, natural", "Bolivia (Plurinational State of)")
+data_cleaned = clean_data(crop1_wide.copy())
 
 """
 
@@ -265,7 +107,7 @@ Calculate average variance, and variance per item/year group, for Yield. Also re
 
 """
 
-crop1_wide_clean = crop1_wide_trimmed.dropna(subset=['Yield'])
+crop1_wide_clean = data_cleaned.dropna(subset=['Yield'])
 def filter_within_percentile(df, column, confidence=0.90, by=None):
     tail = (1 - confidence) / 2
     if by:
