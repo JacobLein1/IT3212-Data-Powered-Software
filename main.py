@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-from scipy import stats
 from clean import clean_data
+from outlier_detection import remove_outliers
 from plot import plot_item_time_series, plot_all_elements_in_area, plot_item_all_areas
 crop1 = pd.read_csv("food.bank/crop1.csv")
 
@@ -44,22 +44,6 @@ print(crop1_wide)
 value_cols = ["Area harvested", "Production", "Yield"]
 
 
-print(pd.DataFrame.info(crop1))
-# Z-score method
-#z_scores = np.abs(stats.zscore(crop1['Value'], nan_policy='omit'))
-#outliers_z = crop1[z_scores > 3]
-#print(f"Z-score outliers: {len(outliers_z)}")
-
-
-
-for col in value_cols:
-    z_scores = np.abs(
-        stats.zscore(crop1_wide[col], nan_policy = "omit")
-    )
-    outliers_z = crop1_wide[z_scores > 3]
-    print(f"{col}: {len(outliers_z)} Z-score outliers")
-
-
 def gini_impurity(df, column):
     """Gini impurity of the value distribution in `column`."""
     probs = df[column].value_counts(normalize=True)
@@ -82,43 +66,19 @@ def variance(df, columns):
 print(variance(crop1, ['Value', 'Year']))
 
 
-# IQR method
-for col in value_cols:
-     Q1 = crop1_wide[col].quantile(0.25)
-     Q3 = crop1_wide[col].quantile(0.75)
-     IQR = Q3 - Q1
-
-     lower = Q1 - 1.5*IQR
-     upper = Q3 + 1.5*IQR
-
-     outliers = crop1_wide[
-          (crop1_wide[col] < lower) |
-          (crop1_wide[col] > upper)
-     ]
-     print(f"{col}: {len(outliers)} outliers")
-
 # DATA CLEANING!
 
 data_cleaned = clean_data(crop1_wide.copy())
 
 """
 
-Calculate average variance, and variance per item/year group, for Yield. Also remove outliers based on percentiles, and print the number of rows before and after filtering.
+Calculate average variance, and variance per item/year group, for Yield. Also remove outliers based on a moving average per Area/Item time series, and print the number of rows removed.
 
 """
 
-crop1_wide_clean = data_cleaned.dropna(subset=['Yield'])
-def filter_within_percentile(df, column, confidence=0.90, by=None):
-    tail = (1 - confidence) / 2
-    if by:
-        lower = df.groupby(by)[column].transform(lambda x: x.quantile(tail))
-        upper = df.groupby(by)[column].transform(lambda x: x.quantile(1 - tail))
-    else:
-        lower = df[column].quantile(tail)
-        upper = df[column].quantile(1 - tail)
-    return df[(df[column] >= lower) & (df[column] <= upper)]
+# OUTLIER DETECTION!
 
-crop1_wide_filtered = filter_within_percentile(crop1_wide_clean, 'Yield', confidence=0.99, by='Item')
+crop1_wide_filtered = remove_outliers(data_cleaned)
 
 # ============================================================
 # 1. Variasjonskoeffisient (CV) per Item/Year — bedre enn ren varians
