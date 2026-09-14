@@ -192,7 +192,7 @@ def remove_outliers(data_in, method="arima", columns=VALUE_COLS, **kwargs):
 # ============================================================
 # Plotting
 # ============================================================
-def plot_outlier_examples(data_in, method="arima", columns=VALUE_COLS, n_examples=3, examples=None, **kwargs):
+def plot_outlier_examples(data_in, method="arima", columns=VALUE_COLS, n_examples=3, examples=None, save_dir=None, **kwargs):
     """
     Plot example (Area, Item) time series with the model reference (moving
     average or ARIMA fitted values), the acceptance band, and the points
@@ -200,8 +200,14 @@ def plot_outlier_examples(data_in, method="arima", columns=VALUE_COLS, n_example
 
     `examples` is an optional list of (Area, Item) tuples. If not given, the
     `n_examples` groups with the most flagged outliers are used.
+
+    If `save_dir` is given, each figure is saved there as
+    "{area}_{item}_{method}.png" instead of being shown.
     """
     import matplotlib.pyplot as plt
+
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
 
     mask = outlier_mask(data_in, method, columns, **kwargs)
 
@@ -249,4 +255,10 @@ def plot_outlier_examples(data_in, method="arima", columns=VALUE_COLS, n_example
 
         fig.suptitle(f"{item} — {area} ({method})")
         plt.tight_layout()
-        plt.show()
+        if save_dir:
+            safe_area = area.replace("/", "-")
+            safe_item = item.replace("/", "-")
+            fig.savefig(os.path.join(save_dir, f"{safe_area}_{safe_item}_{method}.png"), dpi=150)
+            plt.close(fig)
+        else:
+            plt.show()

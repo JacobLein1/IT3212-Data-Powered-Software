@@ -86,17 +86,22 @@ crop1_wide_filtered = remove_outliers(data_cleaned, method="arima", threshold=3.
 
 # plot_outlier_examples(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
 # plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
-plot_outlier_examples(data_cleaned, method="arima", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
-plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
-
 
 # DATA TRANSFORMATION!
 crop1_transformed = transform_data(crop1_wide_filtered)
 
-# plot_outlier_examples(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
-# plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
-plot_outlier_examples(data_cleaned, method="arima", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
-plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
+plot_outlier_examples(
+    data_cleaned,
+    method="arima",
+    examples=[("Botswana", "Maize"), ("Afghanistan", "Sugar beet")],
+    save_dir="plots/outlier_examples_arima",
+)
+plot_outlier_examples(
+    data_cleaned,
+    method="moving_average",
+    examples=[("Botswana", "Maize"), ("Afghanistan", "Sugar beet")],
+    save_dir="plots/outlier_examples_moving_average",
+)
 
 # PLOTS (from data_transformed, computed right after cleaning)
 
