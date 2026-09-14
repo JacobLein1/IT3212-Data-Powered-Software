@@ -249,8 +249,12 @@ def plot_outlier_examples(data_in, method="arima", columns=VALUE_COLS, n_example
             ax.scatter(dropped['Year'], dropped[col], color='red', zorder=3, label="dropped")
             ax.set_title(col)
             ax.set_xlabel("Year")
-            if method == "arima":
-                ax.set_yscale('log')  # the model and its band are on the log scale
+            # same axes regardless of method: log scale (values span orders of magnitude)
+            # and limits set from the data, so a wide band gets clipped instead of stretching the axis
+            ax.set_yscale('log')
+            positive = subset[col][subset[col] > 0]
+            if len(positive):
+                ax.set_ylim(positive.min() / 2, positive.max() * 2)
             ax.legend(fontsize=7)
 
         fig.suptitle(f"{item} — {area} ({method})")
