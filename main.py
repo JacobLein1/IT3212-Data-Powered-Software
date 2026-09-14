@@ -36,10 +36,11 @@ print(crop1_wide)
 def plot_item_time_series(df, item, country):
     elements = ["Area harvested", "Yield", "Production"]
 
+    subset = df[(df['Item'] == item) & (df['Area'] == country)].sort_values('Year')
+
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
     for ax, element in zip(axes, elements):
-        subset = df[(df['Item'] == item) & (df['Element'] == element) & (df['Area'] == country)].sort_values('Year')
-        ax.plot(subset['Year'], subset['Value'], marker='o', markersize=2)
+        ax.plot(subset['Year'], subset[element], marker='o', markersize=2)
         ax.set_title(element)
         ax.set_xlabel("Year")
 
@@ -175,7 +176,6 @@ crop1_wide_trimmed = crop1_wide[
     (seen_real_from_start > 0) & (seen_real_from_end > 0)
 ].reset_index(drop=True)
 
-n = 0
 print(crop1_wide_trimmed.isna().sum().sum())
 print(crop1_wide_trimmed)
 # we can compute the corret missing value if two other values of the same row are present:
@@ -199,10 +199,6 @@ for index, row in crop1_wide_trimmed.loc[one_missing_mask].iterrows():
         crop1_wide_trimmed.loc[index, "Yield"] = (production * 10_000) / area_harvested
     if pd.isna(production):
         crop1_wide_trimmed.loc[index, "Production"] = (area_harvested * yld) / 10_000
-    n+= 1
-
-
-print("AAAAAA", n)
 
 
 print("CROP1 TRIMMED!")
@@ -221,20 +217,47 @@ print(crop1_wide_trimmed)
 
 value_cols = ['Area harvested', 'Yield', 'Production']
 
-# Count NaNs per (Area, Item) time series
-nan_counts = (
+cols = ['Area harvested', 'Production', 'Yield']
+
+def has_overlap(group):
+    non_nan_count = group[cols].notna().sum(axis=1)  # per-row: how many of the 3 are present
+    return (non_nan_count >= 2).any()  # True if at least one row has 2+ series present together
+
+overlap_by_group = (
     crop1_wide_trimmed
+    .groupby(['Area', 'Item'])
+    .apply(has_overlap)
+)
+
+to_drop = overlap_by_group[~overlap_by_group].index  # groups with NO overlap anywhere
+to_keep = overlap_by_group[overlap_by_group].index
+
+print(f"Dropping {len(to_drop)} Area+Item series with no cross-column overlap")
+print(f"Keeping {len(to_keep)} series")
+
+# Filter the dataframe
+mask = crop1_wide_trimmed.set_index(['Area', 'Item']).index.isin(to_drop)
+crop1_wide_cleaned = crop1_wide_trimmed[~mask].reset_index(drop=True)
+
+print(crop1_wide_cleaned)
+
+
+# Count NaNs
+nan_counts = (
+    crop1_wide_cleaned
     .groupby(['Area', 'Item'])[value_cols]
     .apply(lambda g: g.isna().sum().sum())
     .sort_values(ascending=False)
 )
 
-print(nan_counts.head(10))
-
 # Grab the worst offender
 top_area, top_item = nan_counts.index[0]
 worst_series = crop1_wide_trimmed[(crop1_wide_trimmed['Area'] == top_area) & (crop1_wide_trimmed['Item'] == top_item)].sort_values('Year')
 
+print(nan_counts)
+
+plot_item_time_series(crop1_wide_cleaned, "Hemp tow waste", "Germany")
+plot_item_time_series(crop1_wide_cleaned, "Rubber, natural", "Bolivia (Plurinational State of)")
 
 """
 
@@ -284,7 +307,7 @@ def yield_cv_within_items(df):
     return stats_df
 
 
-cv_stats = yield_cv_within_items(crop1_wide_filtered)
+#cv_stats = yield_cv_within_items(crop1_wide_filtered)
 
 
 # ============================================================
@@ -306,7 +329,7 @@ def cv_summary_per_item(cv_stats_df):
     return summary
 
 
-item_cv_summary = cv_summary_per_item(cv_stats)
+#item_cv_summary = cv_summary_per_item(cv_stats)
 
 
 # ============================================================
@@ -341,7 +364,7 @@ def evaluate_yield_estimation(df):
     return df
 
 
-estimation_results = evaluate_yield_estimation(crop1_wide_filtered)
+#estimation_results = evaluate_yield_estimation(crop1_wide_filtered)
 
 
 # ============================================================
@@ -363,4 +386,5 @@ def estimation_error_per_item(estimation_df):
     return summary
 
 
-item_error_summary = estimation_error_per_item(estimation_results)
+#item_error_summary = estimation_error_per_item(estimation_results)
+
