@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from clean import clean_data
 from outlier_detection import remove_outliers, plot_outlier_examples
-from transform import transform_data
+from transform import transform_data, one_hot_encode
 from plot import plot_item_time_series, plot_all_elements_in_area, plot_item_all_areas
 from plot import (
     plot_raw_distributions,
@@ -15,6 +15,7 @@ from plot import (
     plot_transform_steps_boxplots,
     plot_item_transform_steps,
 )
+
 crop1 = pd.read_csv("food.bank/crop1.csv")
 
 print(crop1.head())
@@ -88,9 +89,47 @@ crop1_wide_filtered = remove_outliers(data_cleaned, method="arima", threshold=3.
 # plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
 plot_outlier_examples(data_cleaned, method="arima", threshold=3.5, min_scale=0.1, examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles"), ("Afghanistan", "Sugar beet")], save_dir="plots/outlier_examples_arima")
 plot_outlier_examples(data_cleaned, method="moving_average",  window=5, threshold=0.5, examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles"), ("Afghanistan", "Sugar beet")], save_dir="plots/outlier_examples_moving_average")
+# plot_outlier_examples(data_cleaned, method="arima", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
+# plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
+
+# TRAIN-TEST SPLIT
+split_year = 2008 
+min_train_years = 10
+
+grouped_years = crop1_wide_filtered.groupby(["Area", "Item"])["Year"]
+spans_both = (grouped_years.transform("min") <= split_year) & (grouped_years.transform("max") > split_year)
+train_year_count = (crop1_wide_filtered["Year"] <= split_year).groupby(
+    [crop1_wide_filtered["Area"], crop1_wide_filtered["Item"]]
+).transform("sum")
+keep = spans_both & (train_year_count >= min_train_years)
+crop1_panel = crop1_wide_filtered.loc[keep].reset_index(drop=True)
+n_series_before = grouped_years.ngroups
+n_series_after = crop1_panel.groupby(["Area", "Item"]).ngroups
+print(f"Panel filter (both periods, >= {min_train_years} train years): kept {n_series_after}/{n_series_before} series")
+print(f"Rows: {len(crop1_wide_filtered)} -> {len(crop1_panel)}")
+
+train_raw = crop1_panel.loc[crop1_panel["Year"] <= split_year].reset_index(drop=True)
+test_raw = crop1_panel.loc[crop1_panel["Year"] > split_year].reset_index(drop=True)b732f4 (create train test split)
 
 # DATA TRANSFORMATION!
-crop1_transformed = transform_data(crop1_wide_filtered)
+train_transformed, z_params = transform_data(train_raw)
+test_transformed, _ = transform_data(test_raw, z_params=z_params)
+
+# ONE-HOT ENCODING!
+train_encoded = one_hot_encode(train_transformed)
+test_encoded = one_hot_encode(test_transformed).reindex(columns=train_encoded.columns, fill_value=0)
+
+target_cols = ["Area harvested", "Yield", "Production"]
+derived_cols = [c for c in train_encoded.columns if c.endswith(("_log", "_log_z"))]
+X_train = train_encoded.drop(columns=target_cols + derived_cols)
+y_train = train_encoded[target_cols]
+X_test = test_encoded.drop(columns=target_cols + derived_cols)
+y_test = test_encoded[target_cols]
+
+print(f"Train: {X_train.shape[0]} rows (years <= {split_year})")
+print(f"Test:  {X_test.shape[0]} rows (years > {split_year})")
+print(X_train)
+
 
 plot_outlier_examples(
     data_cleaned,
@@ -104,14 +143,19 @@ plot_outlier_examples(
     examples=[("Botswana", "Maize"), ("Afghanistan", "Sugar beet")],
     save_dir="plots/outlier_examples_moving_average",
 )
+# plot_outlier_examples(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
+# plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
+# plot_outlier_examples(data_cleaned, method="arima", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
+# plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
 
-# PLOTS (from data_transformed, computed right after cleaning)
+
+# PLOTS (from train_transformed, fitted on training data only)
 
 os.makedirs("plots", exist_ok=True)
-plot_raw_distributions(crop1_transformed, save_path="plots/raw_distributions.png")
-plot_log_distributions(crop1_transformed, save_path="plots/log_distributions.png")
-plot_log_z_distributions(crop1_transformed, save_path="plots/log_z_distributions.png")
-plot_transform_steps_histograms(crop1_transformed, save_path="plots/transform_steps_histograms.png")
-plot_transform_steps_qq(crop1_transformed, save_path="plots/transform_steps_qq.png")
-plot_transform_steps_boxplots(crop1_transformed, save_path="plots/transform_steps_boxplots.png")
-plot_item_transform_steps(crop1_transformed, item="Wheat", save_path="plots/wheat_transform_steps.png")
+plot_raw_distributions(train_transformed, save_path="plots/raw_distributions.png")
+plot_log_distributions(train_transformed, save_path="plots/log_distributions.png")
+plot_log_z_distributions(train_transformed, save_path="plots/log_z_distributions.png")
+plot_transform_steps_histograms(train_transformed, save_path="plots/transform_steps_histograms.png")
+plot_transform_steps_qq(train_transformed, save_path="plots/transform_steps_qq.png")
+plot_transform_steps_boxplots(train_transformed, save_path="plots/transform_steps_boxplots.png")
+plot_item_transform_steps(train_transformed, item="Wheat", save_path="plots/wheat_transform_steps.png")
