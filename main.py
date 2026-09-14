@@ -53,9 +53,6 @@ print(crop1_wide)
 #plot_item_all_areas(crop1, "Almonds, with shell")
 
 
-value_cols = ["Area harvested", "Production", "Yield"]
-
-
 def gini_impurity(df, column):
     """Gini impurity of the value distribution in `column`."""
     probs = df[column].value_counts(normalize=True)
@@ -79,14 +76,7 @@ print(variance(crop1, ['Value', 'Year']))
 
 
 # DATA CLEANING!
-
 data_cleaned = clean_data(crop1_wide.copy())
-
-"""
-
-Calculate average variance, and variance per item/year group, for Yield. Also remove outliers based on ARIMA residuals per Area/Item time series, and print the number of rows removed.
-
-"""
 
 # OUTLIER DETECTION!
 
