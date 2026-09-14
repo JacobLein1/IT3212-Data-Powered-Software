@@ -1,3 +1,5 @@
 venv
 __pycache__
 arima_residuals.csv
+plots
+.DS_Store
