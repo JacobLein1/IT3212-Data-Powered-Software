@@ -1,8 +1,20 @@
+import os
+
 import pandas as pd
 import numpy as np
 from clean import clean_data
 from outlier_detection import remove_outliers, plot_outlier_examples
+from transform import transform_data
 from plot import plot_item_time_series, plot_all_elements_in_area, plot_item_all_areas
+from plot import (
+    plot_raw_distributions,
+    plot_log_distributions,
+    plot_log_z_distributions,
+    plot_transform_steps_histograms,
+    plot_transform_steps_qq,
+    plot_transform_steps_boxplots,
+    plot_item_transform_steps,
+)
 crop1 = pd.read_csv("food.bank/crop1.csv")
 
 print(crop1.head())
@@ -77,6 +89,18 @@ Calculate average variance, and variance per item/year group, for Yield. Also re
 """
 
 # OUTLIER DETECTION!
+data_transformed = transform_data(data_cleaned)
+
+crop1_wide_clean = data_cleaned.dropna(subset=['Yield'])
+def filter_within_percentile(df, column, confidence=0.90, by=None):
+    tail = (1 - confidence) / 2
+    if by:
+        lower = df.groupby(by)[column].transform(lambda x: x.quantile(tail))
+        upper = df.groupby(by)[column].transform(lambda x: x.quantile(1 - tail))
+    else:
+        lower = df[column].quantile(tail)
+        upper = df[column].quantile(1 - tail)
+    return df[(df[column] >= lower) & (df[column] <= upper)]
 
 # ARIMA residuals per Area/Item series; the fits are cached in arima_residuals.csv after the first run
 crop1_wide_filtered = remove_outliers(data_cleaned, method="arima", threshold=3.5, min_scale=0.1)
@@ -86,6 +110,17 @@ crop1_wide_filtered = remove_outliers(data_cleaned, method="arima", threshold=3.
 # plot_outlier_examples(data_cleaned, method="moving_average", window=5, threshold=0.5)
 plot_outlier_examples(data_cleaned, method="arima", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
 plot_outlier_examples(data_cleaned, method="moving_average", examples=[("Botswana", "Maize"), ("Eastern Europe", "Mushrooms and truffles")])
+
+# PLOTS (from data_transformed, computed right after cleaning)
+
+os.makedirs("plots", exist_ok=True)
+plot_raw_distributions(data_transformed, save_path="plots/raw_distributions.png")
+plot_log_distributions(data_transformed, save_path="plots/log_distributions.png")
+plot_log_z_distributions(data_transformed, save_path="plots/log_z_distributions.png")
+plot_transform_steps_histograms(data_transformed, save_path="plots/transform_steps_histograms.png")
+plot_transform_steps_qq(data_transformed, save_path="plots/transform_steps_qq.png")
+plot_transform_steps_boxplots(data_transformed, save_path="plots/transform_steps_boxplots.png")
+plot_item_transform_steps(data_transformed, item="Wheat", save_path="plots/wheat_transform_steps.png")
 
 # ============================================================
 # 1. Variasjonskoeffisient (CV) per Item/Year — bedre enn ren varians
