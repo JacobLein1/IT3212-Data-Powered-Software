@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from clean import clean_data
-from outlier_detection import remove_outliers
+from outlier_detection import remove_outliers, plot_outlier_examples
 from plot import plot_item_time_series, plot_all_elements_in_area, plot_item_all_areas
 crop1 = pd.read_csv("food.bank/crop1.csv")
 
@@ -79,6 +79,9 @@ Calculate average variance, and variance per item/year group, for Yield. Also re
 # OUTLIER DETECTION!
 
 crop1_wide_filtered = remove_outliers(data_cleaned)
+
+#plot_outlier_examples(data_cleaned)
+plot_outlier_examples(data_cleaned, examples=[("Eastern Europe", "Mushrooms and truffles")])
 
 # ============================================================
 # 1. Variasjonskoeffisient (CV) per Item/Year — bedre enn ren varians
