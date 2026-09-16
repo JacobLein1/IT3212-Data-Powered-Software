@@ -15,6 +15,7 @@ from plot import (
     plot_transform_steps_boxplots,
     plot_item_transform_steps,
 )
+from sklearn.decomposition import PCA
 
 crop1 = pd.read_csv("food.bank/crop1.csv")
 
@@ -109,7 +110,8 @@ print(f"Panel filter (both periods, >= {min_train_years} train years): kept {n_s
 print(f"Rows: {len(crop1_wide_filtered)} -> {len(crop1_panel)}")
 
 train_raw = crop1_panel.loc[crop1_panel["Year"] <= split_year].reset_index(drop=True)
-test_raw = crop1_panel.loc[crop1_panel["Year"] > split_year].reset_index(drop=True)b732f4 (create train test split)
+test_raw = crop1_panel.loc[crop1_panel["Year"] > split_year
+].reset_index(drop=True)
 
 # DATA TRANSFORMATION!
 train_transformed, z_params = transform_data(train_raw)
@@ -159,3 +161,47 @@ plot_transform_steps_histograms(train_transformed, save_path="plots/transform_st
 plot_transform_steps_qq(train_transformed, save_path="plots/transform_steps_qq.png")
 plot_transform_steps_boxplots(train_transformed, save_path="plots/transform_steps_boxplots.png")
 plot_item_transform_steps(train_transformed, item="Wheat", save_path="plots/wheat_transform_steps.png")
+
+from sklearn.decomposition import PCA
+
+pca_cols = [
+    "area_harvested_log_z",
+    "yield_log_z",
+    "production_log_z"
+]
+
+# Fit PCA only on training data
+pca = PCA(n_components=3)
+
+train_pca = pca.fit_transform(train_transformed[pca_cols])
+test_pca = pca.transform(test_transformed[pca_cols])
+
+print("Explained variance:")
+print(pca.explained_variance_ratio_)
+
+print("Cumulative explained variance:")
+print(pca.explained_variance_ratio_.cumsum())
+
+print("PCA components:")
+print(pca.components_)
+
+# Create PCA columns
+pca_cols = ["area_harvested_log_z",
+            "yield_log_z",
+            "production_log_z"
+]
+# Fit PCA only on the training data
+
+pca = PCA(n_components=3)
+
+train_pca = pca.fit_transform(train_transformed[pca_cols])
+test_pca = pca.transform(test_transformed[pca_cols])
+
+print("Explained variance from PCA:")
+print(pca.explained_variance_ratio_)
+
+print("Cumulative explained variance from PCA:")
+print(pca.explained_variance_ratio_.cumsum())
+
+print("PCA components:")
+print(pca.components_)
