@@ -166,10 +166,9 @@ from sklearn.decomposition import PCA
 
 pca_cols = [
     "area_harvested_log_z",
-    "yield_log_z",
     "production_log_z"
 ]
-
+"""
 # Fit PCA only on training data
 pca = PCA(n_components=3)
 
@@ -192,7 +191,7 @@ pca_cols = ["area_harvested_log_z",
 ]
 # Fit PCA only on the training data
 
-pca = PCA(n_components=3)
+pca = PCA(n_components=2)
 
 train_pca = pca.fit_transform(train_transformed[pca_cols])
 test_pca = pca.transform(test_transformed[pca_cols])
@@ -205,8 +204,8 @@ print(pca.explained_variance_ratio_.cumsum())
 
 print("PCA components:")
 print(pca.components_)
-
-pca = PCA(n_components=2)
+"""
+pca = PCA(n_components=1)
 
 train_pca = pca.fit_transform(train_transformed[pca_cols])
 
@@ -215,4 +214,4 @@ test_pca = pca.transform(test_transformed[pca_cols])
 print("Explained variance ratio:")
 print(pca.explained_variance_ratio_)
 print("Explain variance ratio sum:")
-print(pca.explained_variance_ratio.sum())
+print(pca.explained_variance_ratio_.sum())
