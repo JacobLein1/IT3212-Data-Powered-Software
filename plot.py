@@ -1,6 +1,29 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy import stats
+
+
+def find_series_with_large_internal_gaps(df, min_gap=10, group_cols=("Area", "Item")):
+    """Find series with a run of at least `min_gap` consecutive missing years
+    strictly between two present data points (never leading/trailing, since
+    only gaps between the first and last present year of each series count).
+
+    Returns a DataFrame of group_cols plus `max_internal_gap`, sorted
+    descending by gap size.
+    """
+    rows = []
+    for keys, group in df.groupby(list(group_cols)):
+        years = np.sort(group['Year'].unique())
+        if len(years) < 2:
+            continue
+        gap_sizes = np.diff(years) - 1  # missing years between each pair of consecutive present years
+        max_gap = gap_sizes.max()
+        if max_gap >= min_gap:
+            rows.append((*keys, max_gap))
+
+    result = pd.DataFrame(rows, columns=list(group_cols) + ["max_internal_gap"])
+    return result.sort_values("max_internal_gap", ascending=False).reset_index(drop=True)
 
 
 def plot_item_time_series(df, item, country):
